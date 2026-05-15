@@ -1,0 +1,561 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>흡연 기록 트래커</title>
+<style>
+  :root {
+    --bg: #f7f5f2;
+    --card: #ffffff;
+    --border: #e0ddd8;
+    --text: #1a1a1a;
+    --muted: #888;
+    --accent: #D85A30;
+    --accent-light: #F5C4B3;
+    --accent-dark: #993C1D;
+    --black: #1a1a0a;
+    --font: 'Noto Sans KR', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); font-family: var(--font); color: var(--text); }
+  body { padding: 12px; max-width: 480px; margin: 0 auto; }
+
+  h1 { font-size: 18px; font-weight: 700; color: var(--text); margin-bottom: 6px; letter-spacing: -0.3px; }
+  .sub-copy { font-size: 12px; color: var(--muted); margin-bottom: 14px; line-height: 1.45; }
+  .insight-box { background:#fff9f7; border:1px solid var(--accent-light); color:var(--accent-dark); border-radius:10px; padding:9px 10px; font-size:12px; line-height:1.45; margin-bottom:10px; }
+  .streak-box { margin-top:8px; font-size:12px; color:var(--muted); text-align:center; }
+  .danger { color:#C62828; font-weight:700; }
+  .good { color:#2E7D32; font-weight:700; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px;
+    margin-bottom: 12px;
+  }
+  .sec-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 10px; }
+
+  /* 이름 */
+  .name-row { display: flex; gap: 8px; align-items: center; }
+  .name-input {
+    flex: 1; border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; font-size: 15px; font-family: var(--font);
+    background: var(--bg); color: var(--text); outline: none;
+  }
+  .name-input:focus { border-color: var(--accent); }
+  .btn-save {
+    background: var(--accent); color: #fff; border: none;
+    padding: 10px 16px; border-radius: 8px; font-size: 14px;
+    font-family: var(--font); cursor: pointer; font-weight: 600; white-space: nowrap;
+  }
+  .saved-msg { font-size: 12px; color: var(--accent); display: none; margin-top: 6px; }
+  .aid-btn {
+    display: inline-block; padding: 8px 12px; border-radius: 10px;
+    background: #fff9f7; border: 1px solid var(--accent-light);
+    color: var(--accent-dark); font-size: 13px; font-weight: 600;
+    text-decoration: none; transition: background 0.15s;
+  }
+  .aid-btn:active { background: var(--accent-light); }
+
+  /* 폐 Canvas */
+  .lung-section { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 14px; }
+  #lung-canvas { display: block; width: 260px; height: 200px; }
+
+  .counter-box { text-align: center; width: 100%; }
+  .counter-num { font-size: 42px; font-weight: 700; color: var(--text); line-height: 1; }
+  .counter-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .status-msg { font-size: 13px; font-weight: 600; color: var(--muted); margin-top: 6px; min-height: 18px; }
+
+  /* 버튼 행 */
+  .btn-row { display: flex; gap: 8px; align-items: stretch; }
+  .btn-smoke {
+    flex: 1; background: var(--accent); color: #fff; border: none;
+    padding: 15px 10px; border-radius: 12px; font-size: 17px; font-weight: 700;
+    font-family: var(--font); cursor: pointer; transition: transform 0.1s, background 0.15s;
+  }
+  .btn-smoke:active { transform: scale(0.96); background: var(--accent-dark); }
+
+  .btn-side {
+    background: #fff; color: var(--text); border: 1px solid var(--border);
+    padding: 10px 12px; border-radius: 10px; font-size: 13px; font-weight: 600;
+    font-family: var(--font); cursor: pointer; white-space: nowrap;
+    transition: background 0.1s;
+  }
+  .btn-side:active { background: var(--bg); }
+  .btn-side.restore { color: var(--accent); border-color: var(--accent-light); background: #fff9f7; }
+  .btn-side.restore:disabled { color: var(--muted); border-color: var(--border); background: #fff; opacity: 0.5; }
+
+  .undo-area { display: flex; flex-direction: column; gap: 6px; }
+  .timer-bar-wrap { height: 3px; background: var(--border); border-radius: 2px; overflow: hidden; display: none; }
+  .timer-bar { height: 100%; background: var(--accent); border-radius: 2px; width: 100%; transition: width linear; }
+  .timer-label { font-size: 11px; color: var(--muted); display: none; }
+
+  /* 시간표 */
+  .tt-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; margin-top: 2px; }
+  .timetable { border-collapse: collapse; font-size: 10px; min-width: 200px; width: 100%; }
+  .timetable th { color: var(--muted); font-weight: 500; padding: 2px 2px; text-align: center; font-size: 10px; }
+  .timetable .hl { color: var(--muted); font-size: 10px; padding: 1px 4px 1px 0; white-space: nowrap; text-align: right; }
+  .timetable .dc {
+    border: 1px solid var(--border); border-radius: 2px;
+    transition: background 0.3s; height: 15px;
+  }
+  .tt-note { font-size: 10px; color: var(--muted); margin-top: 6px; line-height: 1.4; }
+
+  /* CSV 버튼 */
+  .csv-btn {
+    background: #fff; border: 1px solid var(--border); color: var(--muted);
+    padding: 6px 12px; border-radius: 7px; font-size: 12px; font-family: var(--font);
+    cursor: pointer;
+  }
+  .csv-btn:active { background: var(--bg); }
+
+  /* 캘린더 */
+  .cal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+  .cal-nav { background: none; border: none; font-size: 22px; color: var(--muted); cursor: pointer; padding: 0 6px; line-height: 1; }
+  .cal-title { font-size: 15px; font-weight: 700; color: var(--text); }
+  .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; }
+  .cal-head { font-size: 10px; color: var(--muted); text-align: center; padding: 2px 0; }
+  .cal-day {
+    border: 1px solid var(--border); border-radius: 7px;
+    padding: 3px 3px 4px; min-height: 44px; background: var(--card);
+  }
+  .cal-day.today { border-color: var(--accent); border-width: 1.5px; }
+  .cal-day.empty { border: none; background: transparent; }
+  .day-num { font-size: 10px; color: var(--muted); }
+  .day-count { font-size: 15px; font-weight: 700; color: var(--text); line-height: 1.2; }
+  .day-bar { height: 3px; border-radius: 2px; margin-top: 3px; background: var(--border); }
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 8px; }
+  .legend-item { display: flex; align-items: center; gap: 4px; font-size: 11px; color: var(--muted); }
+  .lbox { width: 10px; height: 10px; border-radius: 2px; flex-shrink: 0; }
+
+  /* 섹션 헤더 행 */
+  .sec-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<h1>🚬 흡연 기록 트래커</h1>
+<div class="sub-copy">아주상상프로젝트 - 아주짱2조</div>
+
+<!-- 이름 -->
+<div class="card" id="user-card">
+  <div class="sec-title">사용자</div>
+  <div class="name-row">
+    <input class="name-input" id="name-input" type="text" placeholder="이름을 입력하세요" maxlength="20"/>
+    <button class="btn-save" onclick="saveName()">저장</button>
+  </div>
+  <div class="saved-msg" id="saved-msg">저장됐어요 ✓</div>
+  <div class="quit-aids" id="quit-aids" style="display:none;margin-top:12px;">
+    <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:8px;">💊 금연 보조제 - 구매 링크</div>
+    <div style="display:flex;flex-wrap:nowrap;gap:5px;overflow-x:auto;padding-bottom:4px;">
+      <a href="https://www.nicorette.co.kr/products/gum" target="_blank" class="aid-btn" style="font-size:11px;padding:5px 8px;white-space:nowrap;">🍬 니코틴 껌</a>
+      <a href="https://www.nicotinell.co.kr/product.html" target="_blank" class="aid-btn" style="font-size:11px;padding:5px 8px;white-space:nowrap;">🩹 니코틴 패치</a>
+      <a href="https://www.hojununa.com/product-page/nicorette-%EA%B8%88%EC%97%B0%EB%B3%B4%EC%A1%B0%EA%B5%AC%EA%B0%95%EC%8A%A4%ED%94%84%EB%A0%88%EC%9D%B4-%ED%94%84%EB%A0%88%EC%8B%9C%EB%AF%BC%ED%8A%B8" target="_blank" class="aid-btn" style="font-size:11px;padding:5px 8px;white-space:nowrap;">💨 니코틴 스프레이</a>
+      <a href="https://www.instagram.com/reel/DTmmYcniUFL/?igsh=MWZ1YXVhbmpyM2dodg==" target="_blank" class="aid-btn" style="font-size:11px;padding:5px 8px;white-space:nowrap;">🟢 Bizz껌</a>
+    </div>
+  </div>
+</div>
+
+<div class="card" id="aids-top-card" style="display:none;">
+  <div style="font-size:12px;font-weight:600;color:#888;margin-bottom:8px;">💊 금연 보조제 - 구매 링크</div>
+  <div style="display:flex;flex-wrap:nowrap;gap:5px;overflow-x:auto;padding-bottom:4px;">
+    <a href="https://www.nicorette.co.kr/products/gum" target="_blank" class="aid-btn" style="font-size:11px;padding:5px 8px;white-space:nowrap;">🍬 니코틴 껌</a>
+    <a href="https://www.nicotinell.co.kr/product.html" target="_blank" class="aid-btn" style="font-size:11px;padding:5px 8px;white-space:nowrap;">🩹 니코틴 패치</a>
+    <a href="https://www.hojununa.com/product-page/nicorette-%EA%B8%88%EC%97%B0%EB%B3%B4%EC%A1%B0%EA%B5%AC%EA%B0%95%EC%8A%A4%ED%94%84%EB%A0%88%EC%9D%B4-%ED%94%84%EB%A0%88%EC%8B%9C%EB%AF%BC%ED%8A%B8" target="_blank" class="aid-btn" style="font-size:11px;padding:5px 8px;white-space:nowrap;">💨 니코틴 스프레이</a>
+    <a href="https://www.instagram.com/reel/DTmmYcniUFL/?igsh=MWZ1YXVhbmpyM2dodg==" target="_blank" class="aid-btn" style="font-size:11px;padding:5px 8px;white-space:nowrap;">🟢 Bizz껌</a>
+  </div>
+</div>
+
+<div class="card" id="rank-card" style="display:none;">
+  <div class="sec-title">🏆 오늘 흡연 랭크</div>
+  <div id="rank-list" style="margin-top:8px;"></div>
+</div>
+
+<!-- 폐 -->
+<div class="card">
+  <div class="sec-title">내 폐 상태</div>
+  <div class="lung-section">
+    <img id="lung-img" src="" alt="폐 상태" style="display:block;width:260px;height:auto;border-radius:12px;object-fit:contain;">
+    <div class="counter-box">
+      <div class="counter-num" id="count">0</div>
+      <div class="counter-label">오늘 흡연</div>
+      <div class="damage-pct" id="damage-pct" style="font-size:15px;font-weight:700;color:#C62828;margin-top:4px;min-height:20px;"></div>
+      <div class="status-msg" id="status-msg">아직 건강해요 🫁</div>
+      <div class="streak-box" id="streak-box">금연 유지: 0일</div>
+    </div>
+  </div>
+  <div class="btn-row">
+    <div class="undo-area" style="display:flex;flex-direction:column;gap:5px;width:110px;">
+      <div style="display:flex;gap:6px;">
+        <button class="btn-side" onclick="undoSmoke()" style="flex:1;">− 취소</button>
+        <button class="btn-side restore" id="restore-btn" onclick="restoreSmoke()" disabled>복구</button>
+      </div>
+      <div class="timer-bar-wrap" id="timer-wrap">
+        <div class="timer-bar" id="timer-bar"></div>
+      </div>
+      <div class="timer-label" id="timer-label"></div>
+    </div>
+    <button class="btn-smoke" onclick="smoke()">🚬 흡연 기록</button>
+  </div>
+</div>
+<!-- 시간표 -->
+<div class="card">
+  <div class="sec-header">
+    <div class="sec-title" style="margin:0;">오늘 시간표</div>
+    <button class="csv-btn" onclick="downloadCSV()">⬇ CSV</button>
+  </div>
+  <div class="tt-scroll">
+    <table class="timetable" id="timetable">
+      <thead><tr id="tt-head"><th></th></tr></thead>
+      <tbody id="tt-body"></tbody>
+    </table>
+  </div>
+  <div class="tt-note">시간표는 ‘언제 피웠는지’를, 폐 이미지는 ‘얼마나 피웠는지’를 보여줘요</div>
+</div>
+
+<!-- 캘린더 -->
+<div class="card">
+  <div class="cal-header">
+    <button class="cal-nav" onclick="prevMonth()">‹</button>
+    <div class="cal-title" id="cal-title"></div>
+    <button class="cal-nav" onclick="nextMonth()">›</button>
+  </div>
+  <div class="cal-grid" id="cal-heads"></div>
+  <div class="cal-grid" style="margin-top:3px;" id="cal-body"></div>
+  <div class="legend">
+    <div class="legend-item"><div class="lbox" style="background:#F5C4B3;"></div>1~3회</div>
+    <div class="legend-item"><div class="lbox" style="background:#D85A30;"></div>4~9회</div>
+    <div class="legend-item"><div class="lbox" style="background:#111111;"></div>10회+</div>
+  </div>
+</div>
+
+<script>
+
+const LUNG_EXTRA = "images/lung_extra.png";
+const LUNG_IMAGES = [
+  "images/lung_0.jpg",
+  "images/lung_1.jpg",
+  "images/lung_2.jpg",
+  "images/lung_3.jpg",
+  "images/lung_4.png",
+  "images/lung_5.png",
+  "images/lung_7.png",
+  "images/lung_6.png",
+  "images/lung_8.png",
+  "images/lung_9.png"
+];
+
+const MINS = [0,10,20,30,40,50];
+const LM = [
+  [0,1,1,1,1,1,0,0],[1,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,0],
+  [1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,0],
+  [0,1,1,1,1,1,0,0],[0,0,1,1,1,0,0,0],[0,0,0,1,0,0,0,0]
+];
+const RM = LM.map(r => [...r].reverse());
+
+// 데이터
+function todayKey() {
+  const n = new Date();
+  return `${n.getFullYear()}-${String(n.getMonth()+1).padStart(2,'0')}-${String(n.getDate()).padStart(2,'0')}`;
+}
+function load() { try { return JSON.parse(localStorage.getItem('sr_all') || '[]'); } catch(e) { return []; } }
+function save() { try { localStorage.setItem('sr_all', JSON.stringify(allRecords)); } catch(e) {} }
+function loadName() { return localStorage.getItem('sr_name') || ''; }
+function saveName() {
+  var v = document.getElementById('name-input').value.trim();
+  if (!v) return;
+  localStorage.setItem('sr_name', v);
+  var el = document.getElementById('saved-msg');
+  if (el) { el.style.display='block'; setTimeout(function(){ el.style.display='none'; },1500); }
+  applyAfterSave();
+}
+function applyAfterSave() {
+  var sn = loadName();
+  if (!sn) return;
+  var aidsTop = document.getElementById('aids-top-card');
+  if (aidsTop) aidsTop.style.display = 'block';
+  var rankCard = document.getElementById('rank-card');
+  if (rankCard) rankCard.style.display = 'block';
+  setTimeout(function() {
+    var userCard = document.getElementById('user-card');
+    var container = document.querySelector('.container');
+    if (userCard && container) container.appendChild(userCard);
+  }, 100);
+  updateRank();
+}
+
+let allRecords = load();
+function todayRecs() { return allRecords.filter(r => r.date === todayKey()); }
+
+// 자정 초기화
+function checkMidnight() {
+  const last = localStorage.getItem('sr_lastDate') || '';
+  const td = todayKey();
+  if (last && last !== td) resetTT();
+  localStorage.setItem('sr_lastDate', td);
+}
+
+// ── 복구 시스템 ──
+let trashRecord = null;
+let trashTimer = null;
+let timerInterval = null;
+const RESTORE_SEC = 180; // 3분
+
+function startRestoreTimer() {
+  clearTimers();
+  document.getElementById('restore-btn').disabled = false;
+  document.getElementById('timer-wrap').style.display = 'block';
+  document.getElementById('timer-label').style.display = 'block';
+  const bar = document.getElementById('timer-bar');
+  bar.style.transition = 'none';
+  bar.style.width = '100%';
+  setTimeout(() => {
+    bar.style.transition = `width ${RESTORE_SEC}s linear`;
+    bar.style.width = '0%';
+  }, 50);
+
+  let remaining = RESTORE_SEC;
+  timerInterval = setInterval(() => {
+    remaining--;
+    const m = Math.floor(remaining / 60);
+    const s = remaining % 60;
+    document.getElementById('timer-label').textContent = `복구 가능: ${m}:${String(s).padStart(2,'0')}`;
+    if (remaining <= 0) expireTrash();
+  }, 1000);
+  trashTimer = setTimeout(expireTrash, RESTORE_SEC * 1000);
+}
+
+function clearTimers() {
+  clearTimeout(trashTimer);
+  clearInterval(timerInterval);
+  trashTimer = null; timerInterval = null;
+}
+
+function expireTrash() {
+  trashRecord = null;
+  clearTimers();
+  document.getElementById('restore-btn').disabled = true;
+  document.getElementById('timer-wrap').style.display = 'none';
+  document.getElementById('timer-label').style.display = 'none';
+}
+
+function restoreSmoke() {
+  if (!trashRecord) return;
+  allRecords.push(trashRecord);
+  saveToSupabase(trashRecord);
+  updateRank();
+  save();
+  trashRecord = null;
+  expireTrash();
+  refreshTT(); updateLungs(); renderCal();
+}
+
+// ── 폐 Canvas (기관지에서 퍼지는 방식) ──
+function nonSmokingStreak() {
+  let streak = 0;
+  const now = new Date();
+  for (let i = 0; i < 31; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+    const key = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+    if (allRecords.filter(r => r.date === key).length === 0) streak++; else break;
+  }
+  return streak;
+}
+function updatePatternMessage() {}
+
+
+function updateLungs() {
+  const recs = todayRecs(); const cnt = recs.length;
+  const buckets = {};
+  recs.forEach(r => { const k=`${r.date}-${r.hour}-${Math.floor(r.min/10)}`; buckets[k]=(buckets[k]||0)+1; });
+  let bonus = 0; Object.values(buckets).forEach(v => { if (v>=5) bonus += 0.05*(v-4); });
+  const dmg = Math.min(cnt/15 + bonus, 1);
+
+  // 이미지 선택 (9단계 + 15회 이상 특별)
+  const imgEl = document.getElementById('lung-img');
+  if (imgEl) {
+    if (cnt >= 15) {
+      imgEl.src = LUNG_EXTRA;
+    } else {
+      const imgIdx = Math.min(Math.floor(dmg * 10), 9);
+      imgEl.src = LUNG_IMAGES[imgIdx];
+    }
+  }
+
+  // 손상 퍼센트 표시
+  const dmgPct = Math.round(dmg * 100);
+  const pctEl = document.getElementById('damage-pct');
+  if (pctEl) {
+    if (dmgPct === 0) { pctEl.textContent = ''; }
+    else {
+      const col = dmgPct < 30 ? '#E65100' : dmgPct < 60 ? '#C62828' : '#6A1B9A';
+      pctEl.style.color = col;
+      pctEl.textContent = `폐가 ${dmgPct}% 손상되었습니다`;
+    }
+  }
+
+  document.getElementById('count').textContent = cnt;
+  const msg = document.getElementById('status-msg');
+  if (cnt===0)       { msg.style.color='#2E7D32'; msg.textContent='아직 건강해요 🫁'; }
+  else if (cnt<=3)   { msg.style.color='#E65100'; msg.textContent='아, 따가워...'; }
+  else if (cnt<=7)   { msg.style.color='#BF360C'; msg.textContent='나 좀 그만 태워...'; }
+  else if (cnt<=11)  { msg.style.color='#C62828'; msg.textContent='진짜 죽을 것 같아'; }
+  else if (cnt<=14)  { msg.style.color='#B71C1C'; msg.textContent='제발... 한 대만 더 피우면 나 간다'; }
+  else               { msg.style.color='#6A1B9A'; msg.textContent='나 갔어. 😮‍💨'; }
+
+  document.getElementById('streak-box').textContent = `금연 유지: ${nonSmokingStreak()}일`;
+  updatePatternMessage();
+}
+
+// ── 시간표 ──
+function buildTT() {
+  const head = document.getElementById('tt-head');
+  head.innerHTML = '<th style="font-size:10px;color:#888;padding:1px 3px;"></th>';
+  MINS.forEach(m => { const th=document.createElement('th'); th.textContent=m+'분'; head.appendChild(th); });
+  const body = document.getElementById('tt-body'); body.innerHTML = '';
+  for (let h=0; h<24; h++) {
+    const tr = document.createElement('tr');
+    const th = document.createElement('td'); th.className='hl'; th.textContent=String(h).padStart(2,'0')+'시'; tr.appendChild(th);
+    MINS.forEach(m => { const td=document.createElement('td'); td.className='dc'; td.id=`c-${h}-${m}`; tr.appendChild(td); });
+    body.appendChild(tr);
+  }
+}
+function cellColor(n) {
+  if (n===0) return '';
+  var colors = ['#FAE0D6','#F5C4B3','#F0A88A','#EB8C61','#E67038','#D85A30','#C44826','#B0361C','#9C2412','#881208','#6E0E06','#540A04','#3A0602','#200200','#000000'];
+  return colors[Math.min(n-1, colors.length-1)];
+}
+function refreshTT() {
+  resetTT();
+  const buckets = {};
+  todayRecs().forEach(r => { const nm=Math.floor(r.min/10)*10; const k=`${r.hour}-${nm}`; buckets[k]=(buckets[k]||0)+1; });
+  Object.entries(buckets).forEach(([k,n]) => {
+    const [h,m] = k.split('-');
+    const cell = document.getElementById(`c-${h}-${m}`);
+    if (cell) cell.style.background = cellColor(n);
+  });
+}
+function resetTT() { document.querySelectorAll('.dc').forEach(c => c.style.background=''); }
+
+// ── 캘린더 ──
+let calY, calM;
+function initCal() { const n=new Date(); calY=n.getFullYear(); calM=n.getMonth(); }
+function renderCal() {
+  const months=['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
+  document.getElementById('cal-title').textContent=`${calY}년 ${months[calM]}`;
+  document.getElementById('cal-heads').innerHTML=['일','월','화','수','목','금','토'].map(d=>`<div class="cal-head">${d}</div>`).join('');
+  const body=document.getElementById('cal-body'); body.innerHTML='';
+  const first=new Date(calY,calM,1).getDay();
+  const days=new Date(calY,calM+1,0).getDate();
+  const today=new Date();
+  for (let i=0; i<first; i++) { const d=document.createElement('div'); d.className='cal-day empty'; body.appendChild(d); }
+  for (let d=1; d<=days; d++) {
+    const dk=`${calY}-${String(calM+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const cnt=allRecords.filter(r=>r.date===dk).length;
+    const isToday=today.getFullYear()===calY&&today.getMonth()===calM&&today.getDate()===d;
+    const div=document.createElement('div'); div.className='cal-day'+(isToday?' today':'');
+    const barC=cnt===0?'#e0ddd8':cnt<4?'#F5C4B3':cnt<10?'#D85A30':'#111111';
+    const barW=cnt===0?0:Math.min(100,cnt*8);
+    div.innerHTML=`<div class="day-num">${d}</div>${cnt>0?`<div class="day-count">${cnt}</div>`:''}<div class="day-bar" style="width:${barW}%;background:${barC};"></div>`;
+    body.appendChild(div);
+  }
+}
+function prevMonth() { if(calM===0){calY--;calM=11;}else calM--; renderCal(); }
+function nextMonth() { if(calM===11){calY++;calM=0;}else calM++; renderCal(); }
+
+// ── 흡연 기록 / 취소 / 복구 ──
+function smoke() {
+  var now = new Date();
+  var record = { date: todayKey(), hour: now.getHours(), min: now.getMinutes(), time: String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0') };
+  allRecords.push(record);
+  save(); refreshTT(); updateLungs(); renderCal();
+  saveToSupabase(record); updateRank();
+  var btn = document.querySelector('.btn-smoke');
+  if (btn) { btn.style.transform='scale(0.94)'; setTimeout(function(){btn.style.transform='';},130); }
+}
+
+function undoSmoke() {
+  const td = todayKey();
+  const idx = allRecords.map((r,i)=>r.date===td?i:-1).filter(i=>i>=0);
+  if (!idx.length) return;
+  trashRecord = allRecords.splice(idx[idx.length-1], 1)[0];
+  save(); refreshTT(); updateLungs(); renderCal();
+  deleteFromSupabase(trashRecord);
+  updateRank();
+  startRestoreTimer();
+}
+
+// ── CSV ──
+function downloadCSV() {
+  const name = loadName() || '이름없음';
+  const sorted = [...allRecords].sort((a,b)=>a.date.localeCompare(b.date)||a.hour-b.hour||a.min-b.min);
+  const rows = sorted.map(r=>`${name},${r.date},${r.time||String(r.hour).padStart(2,'0')+':'+String(r.min).padStart(2,'0')}`);
+  const csv = '\uFEFF' + '이름,날짜,시간\n' + rows.join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href=url; a.download='흡연기록.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── 초기화 ──
+buildTT(); initCal(); checkMidnight();
+// 초기 폐 이미지 설정
+const lungImgEl = document.getElementById('lung-img');
+if (lungImgEl) lungImgEl.src = LUNG_IMAGES[0];
+var sn2 = loadName();
+if (sn2) {
+  var ni = document.getElementById('name-input');
+  if (ni) ni.value = sn2;
+  applyAfterSave();
+}
+refreshTT(); updateLungs(); renderCal();
+
+setInterval(() => {
+  const n = new Date();
+  if (n.getHours()===0 && n.getMinutes()===0) { checkMidnight(); refreshTT(); updateLungs(); }
+}, 60000);
+
+var SUPABASE_URL='https://fwgszqcctysxegvolftg.supabase.co';
+var SUPABASE_KEY='sb_publishable_yRXq0ckkfqhDCVyhLKLaTQ_WGfvQ9U_';
+function deleteFromSupabase(record) {
+  if (!record || !record.date || !record.time) return;
+  var name = localStorage.getItem('sr_name') || '이름없음';
+  fetch(SUPABASE_URL + '/rest/v1/smoke_records?name=eq.' + encodeURIComponent(name) + '&date=eq.' + record.date + '&time=eq.' + record.time, {
+    method: 'DELETE',
+    headers: {'apikey': SUPABASE_KEY, 'Authorization': 'Bearer ' + SUPABASE_KEY}
+  }).catch(function(e) {});
+}
+function saveToSupabase(record){
+  var name=localStorage.getItem('sr_name')||'이름없음';
+  fetch(SUPABASE_URL+'/rest/v1/smoke_records',{method:'POST',headers:{'Content-Type':'application/json','apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY},body:JSON.stringify({name:name,date:record.date,time:record.time,hour:record.hour,min:record.min})}).catch(function(e){});
+}
+function updateRank(){
+  var el=document.getElementById('rank-list');
+  if(!el)return;
+  var today=todayKey();
+  fetch(SUPABASE_URL+'/rest/v1/smoke_records?select=name,date&date=eq.'+today,{headers:{'apikey':SUPABASE_KEY,'Authorization':'Bearer '+SUPABASE_KEY}}).then(function(r){return r.json();}).then(function(data){
+    if(!Array.isArray(data)||data.length===0){el.innerHTML='<div style="color:#bbb;font-size:13px;text-align:center;padding:12px 0;">아직 오늘 기록이 없어요</div>';return;}
+    var counts={};
+    data.forEach(function(r){counts[r.name]=(counts[r.name]||0)+1;});
+    var sorted=Object.entries(counts).sort(function(a,b){return b[1]-a[1];});
+    var maxCnt=sorted[0][1];
+    var medals=['🥇','🥈','🥉'];
+    el.innerHTML=sorted.map(function(entry,i){
+      var pct=Math.round((entry[1]/maxCnt)*100);
+      return '<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #f0f0f0;">'
+        +'<div style="font-size:17px;width:26px;text-align:center;">'+(medals[i]||(i+1))+'</div>'
+        +'<div style="width:60px;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+entry[0]+'</div>'
+        +'<div style="flex:1;height:18px;background:#f0f0f0;border-radius:4px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:linear-gradient(90deg,#e74c3c,#f39c12);border-radius:4px;"></div></div>'
+        +'<div style="font-size:13px;font-weight:700;color:#e74c3c;margin-left:6px;width:36px;text-align:right;">'+entry[1]+'개비</div>'
+        +'</div>';
+    }).join('');
+  }).catch(function(){var el2=document.getElementById('rank-list');if(el2)el2.innerHTML='<div style="color:#bbb;font-size:13px;text-align:center;padding:12px;">연결 중...</div>';});
+}
+setInterval(updateRank,30000);
+</script>
+</body>
+</html>
